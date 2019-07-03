@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Minimal character-level LSTM model. Written by Ngoc Quan Pham
 Code structure borrowed from the Vanilla RNN model from Andreij Karparthy @karparthy.

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Implementation of the character-level Elman RNN model.
 Written by Ngoc-Quan Pham based on Andreij Karparthy's lecture Cs231n.
