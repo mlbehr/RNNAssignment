@@ -72,7 +72,7 @@ Why = np.random.randn(vocab_size, hidden_size)*0.01 # hidden to output
 by = np.zeros((vocab_size, 1)) # output bias
 
 
-def forward(inputs, targets, memory):
+def forward(inputs, labels, memory):
     """
     inputs,targets are both list of integers.
     hprev is Hx1 array of initial hidden state
@@ -85,7 +85,8 @@ def forward(inputs, targets, memory):
 
     # Here you should allocate some variables to store the activations during forward
     # One of them here is to store the hiddens and the cells
-    hs, cs = {}
+    hs, chats, cs, igates, ogates, fgates, ps, ys = {}, {}, {}, {}, {}, {}, {}, {}
+    xs, wes, zs = {}, {}, {}
 
     hs[-1] = np.copy(hprev)
     cs[-1] = np.copy(cprev)
@@ -109,45 +110,60 @@ def forward(inputs, targets, memory):
 
         # compute the forget gate
         # f_gate = sigmoid (W_f \cdot [h X] + b_f)
+        fgates[t] = sigmoid(np.dot(Wf, zs[t]) + bf)
+        
 
         # compute the input gate
         # i_gate = sigmoid (W_i \cdot [h X] + b_i)
+        igates[t] = sigmoid(np.dot(Wi, zs[t]) + bi)
 
         # compute the candidate memory
         # \hat{c} = tanh (W_c \cdot [h X] + b_c])
+        chats[t] = np.tanh(np.dot(Wc, zs[t]) + bc)
 
         # new memory: applying forget gate on the previous memory
         # and then adding the input gate on the candidate memory
         # c_new = f_gate * prev_c + i_gate * \hat{c}
+        cs[t] = fgates[t] * cs[t-1] + igates[t] * chats[t]
 
         # output gate
         # o_gate = sigmoid (Wo \cdot [h X] + b_o)
+        ogates[t] = sigmoid(np.dot(Wo, zs[t]) + bo)
 
         # new hidden state for the LSTM
         # h = o_gate * tanh(c_new)
+        hs[t] = ogates[t] * np.tanh(cs[t])
 
         # DONE LSTM
         # output layer - softmax and cross-entropy loss
         # unnormalized log probabilities for next chars
 
         # o = Why \cdot h + by
+        o = np.dot(Why, hs[t]) + by
 
         # softmax for probabilities for next chars
         # p = softmax(o)
+        ps[t] = softmax(o)
 
         # cross-entropy loss
         # cross entropy loss at time t:
         # create an one hot vector for the label y
+        ys[t] = np.zeros((vocab_size,1))
+        ys[t][labels[t]] = 1
 
         # and then cross-entropy (see the elman-rnn file for the hint)
+        loss_t = np.sum(-np.log(ps[t]) * ys[t])
+        loss += loss_t
 
     # define your activations
+    activations = (xs, zs, hs, chats, cs, fgates, ogates, igates, ps, ys)
     memory = (hs[len(inputs)-1], cs[len(inputs)-1])
 
     return loss, activations, memory
 
 
 def backward(activations, clipping=True):
+    xs, zs, hs, chats, cs, fgates, ogates, igates, ps, ys = activations
 
     # backward pass: compute gradients going backwards
     # Here we allocate memory for the gradients
@@ -158,15 +174,45 @@ def backward(activations, clipping=True):
 
     # similar to the hidden states in the vanilla RNN
     # We need to initialize the gradients for these variables
-    dhnext = np.zeros_like(hs[0])
-    dcnext = np.zeros_like(cs[0])
+    dh = np.zeros_like(hs[0])
+    dc = np.zeros_like(cs[0])
+    dogatepre = np.zeros_like(ogates[0])
+    dfgatepre = np.zeros_like(fgates[0])
+    digatepre = np.zeros_like(igates[0])
+   
 
     # back propagation through time starts here
     for t in reversed(range(len(inputs))):
 
         # IMPLEMENT YOUR BACKPROP HERE
         # refer to the file elman_rnn.py for more details
+        do = ps[t] - ys[t]
+        
+        dWhy += np.dot(do, hs[t].T)
+        dby += do
 
+        dh += np.dot(Why.T, do)
+
+        dogatepre += np.tanh(cs[t]) * dsigmoid(ogates[t])
+        dWo += np.dot(dogatepre, zs[t].T)
+        dbo += dogatepre
+        
+        dc += ogates[t] * dtanh(np.tanh(cs[t]))
+        
+        dfgatepre += cs[t - 1] * dsigmoid(fgates[t])
+        dWf += np.dot(dfgatepre, zs[t].T)
+        dbf += dfgatepre
+
+        digatepre += chats[t] * dsigmoid(igates[t])
+        dWi += np.dot(digatepre, zs[t].T)
+        dbi += digatepre
+
+        dc_hat_pre = igates[t] * dtanh(chats[t])
+        dWc += np.dot(dc_hat_pre, zs[t].T)
+        dbc += dc_hat_pre
+ 
+        dz = np.dot(Wc.T, dc_hat_pre) + np.dot(Wi.T, digatepre) + np.dot(Wf.T, dfgatepre) + np.dot(Wo.T, dogatepre)
+        dWex = np.dot(dz, xs[t].T) 
 
     if clipping:
         # clip to mitigate exploding gradients
@@ -186,13 +232,32 @@ def sample(memory, seed_ix, n):
     h, c = memory
     x = np.zeros((vocab_size, 1))
     x[seed_ix] = 1
+    generated_chars = []
 
     for t in range(n):
         # IMPLEMENT THE FORWARD FUNCTION ONE MORE TIME HERE
         # BUT YOU DON"T NEED TO STORE THE ACTIVATIONS
+        e = np.dot(Wex, x)
+        z = np.row_stack((h, e))
+
+        in_gate = sigmoid(np.dot(Wi, z) + bi)
+        f_gate = sigmoid(np.dot(Wf, z) + bf)
+        c_hat = np.tanh(np.dot(Wc, z) + bc)
+        c = c_hat * in_gate + c * f_gate
+        o_gate = sigmoid(np.dot(Wo, z) + bo)
+        h = o_gate * np.tanh(c)
+        p = softmax(h)
+
+        ix = np.random.multinomial(1, p.ravel())
+        for j in range(len(ix)):
+            if ix[j] == 1:
+                index = j
+        generated_chars.append(index)
+        x = np.zeros((vocab_size, 1))
+        x[index] = 1
 
 
-    return
+    return generated_chars
 
 if option == 'train':
 
