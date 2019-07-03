@@ -212,7 +212,8 @@ def backward(activations, clipping=True):
         dbc += dc_hat_pre
  
         dz = np.dot(Wc.T, dc_hat_pre) + np.dot(Wi.T, digatepre) + np.dot(Wf.T, dfgatepre) + np.dot(Wo.T, dogatepre)
-        dWex = np.dot(dz, xs[t].T) 
+        dWex = np.dot(dz[hidden_size:,:], xs[t].T) 
+        #dWex = np.dot(dz[0:emb_size,:], xs[t].T) 
 
     if clipping:
         # clip to mitigate exploding gradients
@@ -298,9 +299,10 @@ if option == 'train':
         if n % 100 == 0: print ('iter %d, loss: %f' % (n, smooth_loss)) # print progress
 
         # perform parameter update with Adagrad
-        for param, dparam, mem in zip([Wf, Wi, Wo, Wc, bf, bi, bo, bc, Wex, Why, by],
+        for param, dparam, mem, name in zip([Wf, Wi, Wo, Wc, bf, bi, bo, bc, Wex, Why, by],
                                     [dWf, dWi, dWo, dWc, dbf, dbi, dbo, dbc, dWex, dWhy, dby],
-                                    [mWf, mWi, mWo, mWc, mbf, mbi, mbo, mbc, mWex, mWhy, mby]):
+                                    [mWf, mWi, mWo, mWc, mbf, mbi, mbo, mbc, mWex, mWhy, mby], ["Wf","Wi","Wo","Wc","bf","bi","bo","bc","Wex","Why","by"]):
+#            print("  ",name, param.shape, dparam.shape)
             mem += dparam * dparam
             param += -learning_rate * dparam / np.sqrt(mem + 1e-8) # adagrad update
 
