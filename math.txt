@@ -1,0 +1,94 @@
+Elman-RNN
+=========
+                          [p]                        [p]
+                      (softmax+by)               (softmax+by)
+                         {Why}                      {Why}
+                           |                          |
+          ,----------------+---.     ,----------------+---.
+          |                |   |     |                |   |
+>---------+-[h].      ,[h]-'---+-->--+-[h].      ,[h]-'---+----->
+          |    |   (tanh+bh)   |     |    |   (tanh+bh)   |
+          |  {Whh}    |        |     |  {Whh}    |        |
+          |    |   [h_pre]     |     |    |   [h_pre]     |
+          | ,--#------'        |     | ,--#------'        |
+          '-+------------------'     '-+------------------'
+            |                          |
+          {Wxh}                      {Wxh}
+           [x]                        [x]
+          {Wex}                      {Wex}
+           [c]                        [c]
+ 
+do = p - y
+dWhy += do * h^T
+dby += do
+
+dh = Why^T * do + dh
+dh_pre = (1 - h²) * dh
+dbh += dh_pre
+
+dWhh += dh_pre * h[n-1]^T
+dh = Whh^T * dh_pre
+
+dWxh += d_pre * x^T
+dx = Wxh^T * d_pre
+dWex += dx * c^T
+
+LSTM
+====
+         ,----------------------------------------------------.   ,----------------
+         |                                                    |   |
+---------+-[c]------(*)---------------(+)--[c]-----------.----+---+-[c]------(*)---
+         |           |                 |               (tanh) |   |           |
+         |          [fg]      ,--[ig]-(*)                |    |   |          [fg]
+         |           |        |      [c_hat]     ,-[og]-(*)   |   |           |
+         |        (sig+bf) (sig+bi) (tanh+bc) (sig+bo)   |    |   |        (sig+bf)
+         |          {Wf}     {Wi}     {Wc}      {Wo}     |    |   |          {Wf}
+         |           |        |        |         |       |    |   |           |
+---------+-[h]-#-[z]-'--------'--------'---------'       `--.-+---+-[h]-#-[z]-'----
+         |     |                                            | |   |     |
+         `-----+--------------------------------------------+-´   `-----+----------
+               |                                            |           |
+             [wes]                                        {Why}
+             {Wex}                                     (softmax+by)
+              [x]                                          [b]
+
+df(a*b) / da = df'(a*b)/d(a*b) * d(a*b)/da = dab * b
+df(a+b) / da = df'(a+b)/d(a+b) * (da/da (1) + db/da (0)) = dab
+
+
+do = p - y
+dWhy += do * h^T
+dby += do
+
+dh = Why^T * do + dh
+
+dog = dh * tanh(c)
+dog_pre = dog * og * (1 - og)
+dWo += dog_pre * z^T
+dbo += dog_pre
+
+dtanc = dh * og
+dc = dtanc * (1 - tanh(c)²) + dc
+
+dc_hat = dc * ig
+dc_hat_pre = dc_hat * (1 - c_hat²)
+dWc += dc_hat_pre * z^T
+dbc += dc_hat_pre
+
+dig = dc * c_hat
+dig_pre = dig * ig * (1 - ig)
+dWi += dig_pre * z^T
+dbi += dig_pre
+
+dfg = dc * c[t-1]
+dfg_pre = dfg * fg * (1 - fg)
+dWf += dfg_pre * z^T
+dbf += dfg_pre
+
+dc = dc * fg
+
+dz = Wf^T * dfg_pre + Wi^T * dig_pre + Wc^T * dc_hat_pre + Wo^T * dog_pre
+
+dh = dz[:?]
+dwes = dz[?:]
+dWex += adwes * x^T
