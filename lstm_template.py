@@ -284,7 +284,8 @@ if option == 'train':
         if p+seq_length+1 >= len(data) or n == 0:
             hprev = np.zeros((hidden_size,1)) # reset RNN memory
             cprev = np.zeros((hidden_size,1))
-        p = 0 # go from start of data
+            p = 0 # go from start of data
+        
         inputs = [char_to_ix[ch] for ch in data[p:p+seq_length]]
         targets = [char_to_ix[ch] for ch in data[p+1:p+seq_length+1]]
 
