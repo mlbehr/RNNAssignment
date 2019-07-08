@@ -174,6 +174,7 @@ def backward(activations, clipping=True):
 
     # similar to the hidden states in the vanilla RNN
     # We need to initialize the gradients for these variables
+    # these will not be returned
     dh = np.zeros_like(hs[0])
     dc = np.zeros_like(cs[0])
     dogatepre = np.zeros_like(ogates[0])
@@ -191,29 +192,32 @@ def backward(activations, clipping=True):
         dWhy += np.dot(do, hs[t].T)
         dby += do
 
-        dh += np.dot(Why.T, do)
+        dh = np.dot(Why.T, do) + dh
 
-        dogatepre += np.tanh(cs[t]) * dsigmoid(ogates[t])
+        dogatepre = dh * np.tanh(cs[t]) * dsigmoid(ogates[t])
         dWo += np.dot(dogatepre, zs[t].T)
         dbo += dogatepre
         
-        dc += ogates[t] * dtanh(np.tanh(cs[t]))
+        dc = dh * ogates[t] * dtanh(np.tanh(cs[t])) + dc
         
-        dfgatepre += cs[t - 1] * dsigmoid(fgates[t])
-        dWf += np.dot(dfgatepre, zs[t].T)
-        dbf += dfgatepre
+        dc_hat_pre = dc * igates[t] * dtanh(chats[t])
+        dWc += np.dot(dc_hat_pre, zs[t].T)
+        dbc += dc_hat_pre
 
-        digatepre += chats[t] * dsigmoid(igates[t])
+        digatepre = dc * chats[t] * dsigmoid(igates[t])
         dWi += np.dot(digatepre, zs[t].T)
         dbi += digatepre
 
-        dc_hat_pre = igates[t] * dtanh(chats[t])
-        dWc += np.dot(dc_hat_pre, zs[t].T)
-        dbc += dc_hat_pre
- 
+        dfgatepre = dc * cs[t - 1] * dsigmoid(fgates[t])
+        dWf += np.dot(dfgatepre, zs[t].T)
+        dbf += dfgatepre
+
+        dc = dc * fgates[t]
+
         dz = np.dot(Wc.T, dc_hat_pre) + np.dot(Wi.T, digatepre) + np.dot(Wf.T, dfgatepre) + np.dot(Wo.T, dogatepre)
-        dWex = np.dot(dz[hidden_size:,:], xs[t].T) 
-        #dWex = np.dot(dz[0:emb_size,:], xs[t].T) 
+        dh = dz[:hidden_size]
+        dwes = dz[hidden_size:]
+        dWex += np.dot(dwes, xs[t].T) 
 
     if clipping:
         # clip to mitigate exploding gradients
@@ -247,7 +251,8 @@ def sample(memory, seed_ix, n):
         c = c_hat * in_gate + c * f_gate
         o_gate = sigmoid(np.dot(Wo, z) + bo)
         h = o_gate * np.tanh(c)
-        p = softmax(h)
+        o = np.dot(Why, h) + by
+        p = softmax(o)
 
         ix = np.random.multinomial(1, p.ravel())
         for j in range(len(ix)):
