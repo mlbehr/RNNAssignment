@@ -44,10 +44,10 @@ std = 0.1
 option = sys.argv[1]
 
 # hyperparameters
-emb_size = 4
-hidden_size = 32  # size of hidden layer of neurons
-seq_length = 64  # number of steps to unroll the RNN for
-learning_rate = 5e-2
+emb_size = 8
+hidden_size = 128  # size of hidden layer of neurons
+seq_length = 256  # number of steps to unroll the RNN for
+learning_rate = 8e-2
 max_updates = 500000
 
 concat_size = emb_size + hidden_size
@@ -271,8 +271,9 @@ if option == 'train':
     n_updates = 0
     best = 1000000
     best_it = 0
-    milestones = [150, 140, 130, 125, 120, 115, 110, 105, 100, 95, 92, 90, 88, 86, 84, 82, 80, 75, 70]
+    milestones = [300, 140, 130, 125, 120, 115, 110, 105, 100, 95, 92, 90, 88, 86, 84, 82, 80, 75, 70]
     iterations = [0] * len(milestones)
+    milestonesTime = [0] * len(milestones)
     startTime = time.time()
     time100iterations = startTime
 
@@ -313,14 +314,15 @@ if option == 'train':
             if smooth_lossIF < best:
                 best = smooth_lossIF
                 best_it = n
+            now = time.time()
             for i in range(len(milestones)):
                 if smooth_lossIF <= milestones[i] and iterations[i] == 0: 
                     iterations[i] = n
-            now = time.time()
+                    milestonesTime[i] = now - startTime
             print ('iter %d, loss: %.2f, best: %.2f (iter %d), time for 100 iterations: %d, runtime: %d' % (n, smooth_lossIF, best, best_it, (now - time100iterations), (now - startTime))) # print progress
             for i in range(len(iterations)):
                 if iterations[i] != 0:
-                    print('milestone %d in %d iteraions' % (milestones[i], iterations[i]))
+                    print('milestone %d in %d iteraions (%d seconds)' % (milestones[i], iterations[i], milestonesTime[i]))
             time100iterations = time.time()
 
         # perform parameter update with Adagrad
