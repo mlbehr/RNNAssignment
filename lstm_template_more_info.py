@@ -46,9 +46,15 @@ option = sys.argv[1]
 # hyperparameters
 emb_size = 8
 hidden_size = 128  # size of hidden layer of neurons
-seq_length = 256  # number of steps to unroll the RNN for
-learning_rate = 8e-2
+seq_length = 32  # number of steps to unroll the RNN for
+learning_rate = 10e-2
 max_updates = 500000
+
+print("Hyper Parameters:")
+print("emb_size:", emb_size)
+print("seq_length:", seq_length)
+print("learning_rate:", learning_rate)
+print("max_updates", max_updates)
 
 concat_size = emb_size + hidden_size
 
@@ -271,7 +277,7 @@ if option == 'train':
     n_updates = 0
     best = 1000000
     best_it = 0
-    milestones = [300, 140, 130, 125, 120, 115, 110, 105, 100, 95, 92, 90, 88, 86, 84, 82, 80, 75, 70]
+    milestones = [150, 140, 130, 125, 120, 115, 110, 105, 100, 95, 92, 90, 88, 86, 84, 82, 80, 75, 70]
     iterations = [0] * len(milestones)
     milestonesTime = [0] * len(milestones)
     startTime = time.time()
@@ -302,6 +308,7 @@ if option == 'train':
             txt = ''.join(ix_to_char[ix] for ix in sample_ix)
             print ('----\n %s \n----' % (txt, ))
 
+
         # forward seq_length characters through the net and fetch gradient
         loss, activations, memory = forward(inputs, targets, (hprev, cprev))
         gradients = backward(activations)
@@ -324,6 +331,8 @@ if option == 'train':
                 if iterations[i] != 0:
                     print('milestone %d in %d iteraions (%d seconds)' % (milestones[i], iterations[i], milestonesTime[i]))
             time100iterations = time.time()
+
+            sys.stdout.flush()
 
         # perform parameter update with Adagrad
         for param, dparam, mem, name in zip([Wf, Wi, Wo, Wc, bf, bi, bo, bc, Wex, Why, by],
