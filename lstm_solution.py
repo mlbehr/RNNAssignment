@@ -4,11 +4,16 @@
 Minimal character-level LSTM model. Written by Ngoc Quan Pham
 Code structure borrowed from the Vanilla RNN model from Andreij Karparthy @karparthy.
 BSD License
+
+Solution by:
+Moritz Behr    1929868
+Patrick Jaberg 1943493
+Marcel Riedel  1980230
 """
 import numpy as np
 from random import uniform
 import sys
-import time
+
 
 # Since numpy doesn't have a function for sigmoid
 # We implement it manually here
@@ -44,17 +49,11 @@ std = 0.1
 option = sys.argv[1]
 
 # hyperparameters
-emb_size = 8
-hidden_size = 128  # size of hidden layer of neurons
-seq_length = 32  # number of steps to unroll the RNN for
-learning_rate = 10e-2
+emb_size = 4
+hidden_size = 32  # size of hidden layer of neurons
+seq_length = 64  # number of steps to unroll the RNN for
+learning_rate = 5e-2
 max_updates = 500000
-
-print("Hyper Parameters:")
-print("emb_size:", emb_size)
-print("seq_length:", seq_length)
-print("learning_rate:", learning_rate)
-print("max_updates", max_updates)
 
 concat_size = emb_size + hidden_size
 
@@ -275,13 +274,6 @@ if option == 'train':
 
     n, p = 0, 0
     n_updates = 0
-    best = 1000000
-    best_it = 0
-    milestones = [150, 140, 130, 125, 120, 115, 110, 105, 100, 95, 92, 90, 88, 86, 84, 82, 80, 75, 70]
-    iterations = [0] * len(milestones)
-    milestonesTime = [0] * len(milestones)
-    startTime = time.time()
-    time100iterations = startTime
 
     # momentum variables for Adagrad
     mWex, mWhy = np.zeros_like(Wex), np.zeros_like(Why)
@@ -308,37 +300,19 @@ if option == 'train':
             txt = ''.join(ix_to_char[ix] for ix in sample_ix)
             print ('----\n %s \n----' % (txt, ))
 
-
         # forward seq_length characters through the net and fetch gradient
         loss, activations, memory = forward(inputs, targets, (hprev, cprev))
         gradients = backward(activations)
 
         hprev, cprev = memory
         dWex, dWf, dWi, dWo, dWc, dbf, dbi, dbo, dbc, dWhy, dby = gradients
-        smooth_loss = smooth_loss * 0.999 + loss * 0.001 
-        if n % 100 == 0: 
-            smooth_lossIF = smooth_loss * (64 / seq_length)
-            if smooth_lossIF < best:
-                best = smooth_lossIF
-                best_it = n
-            now = time.time()
-            for i in range(len(milestones)):
-                if smooth_lossIF <= milestones[i] and iterations[i] == 0: 
-                    iterations[i] = n
-                    milestonesTime[i] = now - startTime
-            print ('iter %d, loss: %.2f, best: %.2f (iter %d), time for 100 iterations: %d, runtime: %d' % (n, smooth_lossIF, best, best_it, (now - time100iterations), (now - startTime))) # print progress
-            for i in range(len(iterations)):
-                if iterations[i] != 0:
-                    print('milestone %d in %d iteraions (%d seconds)' % (milestones[i], iterations[i], milestonesTime[i]))
-            time100iterations = time.time()
-
-            sys.stdout.flush()
+        smooth_loss = smooth_loss * 0.999 + loss * 0.001
+        if n % 100 == 0: print ('iter %d, loss: %f' % (n, smooth_loss)) # print progress
 
         # perform parameter update with Adagrad
-        for param, dparam, mem, name in zip([Wf, Wi, Wo, Wc, bf, bi, bo, bc, Wex, Why, by],
+        for param, dparam, mem in zip([Wf, Wi, Wo, Wc, bf, bi, bo, bc, Wex, Why, by],
                                     [dWf, dWi, dWo, dWc, dbf, dbi, dbo, dbc, dWex, dWhy, dby],
-                                    [mWf, mWi, mWo, mWc, mbf, mbi, mbo, mbc, mWex, mWhy, mby], ["Wf","Wi","Wo","Wc","bf","bi","bo","bc","Wex","Why","by"]):
-#            print("  ",name, param.shape, dparam.shape)
+                                    [mWf, mWi, mWo, mWc, mbf, mbi, mbo, mbc, mWex, mWhy, mby]):
             mem += dparam * dparam
             param += -learning_rate * dparam / np.sqrt(mem + 1e-8) # adagrad update
 
